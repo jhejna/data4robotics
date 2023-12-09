@@ -58,3 +58,14 @@ Once the conversion is complete, you can run the example command below:
 python finetune.py exp_name=test agent.features.restore_path=/path/to/SOUP_1M_DH.pth buffer_path=/data/path/buffer.pkl
 ```
 This will result in a policy checkpoint saved in the `bc_finetune/<exp_name>` folder.
+
+# Finetuning
+
+Download VC 1 https://drive.google.com/file/d/1gbRg3nhunLQZ9cQnJbR0GZddpUGlVXJS/view
+
+can also run ./download_features.sh for image net.
+
+command was 
+```
+python finetune.py agent/features=vit_base agent.features.restore_path=/path/to/vc1.pth task=blue_mug exp_name=mug_vc1
+```

@@ -1,0 +1,27 @@
+# Copyright (c) Sudeep Dasari, 2023
+
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+
+
+_target_: data4robotics.task.DefaultTask
+obs_dim: 0
+ac_dim: 7
+n_cams: 1
+
+
+train_buffer:
+  _target_: data4robotics.replay_buffer.RobotLightningReplayBuffer
+  buffer_path: /iliad/u/jhejna/datasets/orca/franka_coffee_pod_all/train
+  normalization_path: /iliad/u/jhejna/data4robotics/scripts/franka_coffee_pod_all_dataset_statistics.json
+  transform: ${transform:${train_transform}}
+  ac_chunk: ${ac_chunk}
+  cams: ["agent"]
+
+test_buffer:
+  _target_: data4robotics.replay_buffer.RobotLightningReplayBuffer
+  buffer_path: /iliad/u/jhejna/datasets/orca/franka_coffee_pod_all/val
+  normalization_path: /iliad/u/jhejna/data4robotics/scripts/franka_coffee_pod_all_dataset_statistics.json
+  transform: ${transform:preproc}
+  ac_chunk: ${ac_chunk}
+  cams: ${task.train_buffer.cams}

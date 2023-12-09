@@ -7,9 +7,11 @@
 import random, torch, tqdm
 import numpy as np
 import pickle as pkl
-from robobuf import ReplayBuffer as RB
 from torch.utils.data import Dataset, IterableDataset
 
+from typing import Dict, Optional, List, Any, Union
+import glob
+import os
 
 # helper functions
 _img_to_tensor = lambda x: torch.from_numpy(x.copy()).permute((0, 3, 1, 2)).float() / 255
@@ -128,3 +130,108 @@ class RobobufReplayBuffer(ReplayBuffer):
             i_t_prime, o_t_prime = t.next.obs.image(cam_idx)[None], t.next.obs.state
             a_t = t.action
             self.s_a_sprime.append(((i_t, o_t), a_t, (i_t_prime, o_t_prime)))
+
+# Add robot lightning utils
+def _flatten_dict_helper(flat_dict: Dict, value: Any, prefix: str, separator: str = ".") -> None:
+    if isinstance(value, dict):
+        for k in value.keys():
+            assert isinstance(k, str), "Can only flatten dicts with str keys"
+            _flatten_dict_helper(flat_dict, value[k], prefix + separator + k, separator=separator)
+    else:
+        flat_dict[prefix[1:]] = value
+
+
+def flatten_dict(d: Dict, separator: str = ".") -> Dict:
+    flat_dict = dict()
+    _flatten_dict_helper(flat_dict, d, "", separator=separator)
+    return flat_dict
+
+
+def nest_dict(d: Dict, separator: str = ".") -> Dict:
+    nested_d = dict()
+    for key in d.keys():
+        key_parts = key.split(separator)
+        current_d = nested_d
+        while len(key_parts) > 1:
+            if key_parts[0] not in current_d:
+                current_d[key_parts[0]] = dict()
+            current_d = current_d[key_parts[0]]
+            key_parts.pop(0)
+        current_d[key_parts[0]] = d[key]  # Set the value
+    return nested_d
+
+def load_data(path: str, exclude_keys: Optional[List[str]]=None) -> Dict:
+    with open(path, "rb") as f:
+        data = np.load(f)
+        data = {k: data[k] for k in data.keys()}
+    # Unnest the data to get everything in the correct format
+    if exclude_keys is not None:
+        for k in exclude_keys:
+            del data[k]  # Remove exclude keys
+    data = nest_dict(data)
+    return data
+
+def get_from_batch(batch: Any, start: Union[int, np.ndarray, torch.Tensor], end: Optional[int] = None) -> Any:
+    if isinstance(batch, dict):
+        return {k: get_from_batch(v, start, end=end) for k, v in batch.items()}
+    elif isinstance(batch, (list, tuple)):
+        return [get_from_batch(v, start, end=end) for v in batch]
+    elif isinstance(batch, (np.ndarray, torch.Tensor)):
+        if end is None:
+            return batch[start]
+        else:
+            return batch[start:end]
+    else:
+        raise ValueError("Unsupported type passed to `get_from_batch`")
+
+
+class RobotLightningReplayBuffer(ReplayBuffer):
+
+    def __init__(self, buffer_path, normalization_path=None, transform=None, ac_chunk=1, cams=["agent"]):
+        self.transform = transform
+        assert ac_chunk == 1
+        self.s_a_sprime = []
+
+        if normalization_path is not None:
+            import json
+            with open(normalization_path, 'r') as json_file:
+                json_data = json.load(json_file)
+            mean = np.array(json_data["mean"], dtype=np.float32)
+            std = np.array(json_data["std"], dtype=np.float32)
+
+        # Load the data
+        episode_paths = glob.glob(os.path.join(buffer_path, "*.npz"))
+        for episode_path in episode_paths:
+            episode = load_data(episode_path)
+            # Concatenate all the cameras
+            state_key_order = sorted([k for k in episode["obs"]["state"].keys()])
+            for t in range(1, len(episode["done"])):
+                obs = get_from_batch(episode["obs"], t - 1)
+                # next_obs = get_from_batch(episode["obs"], t)
+                a_t = get_from_batch(episode["action"], t)
+
+                if normalization_path is not None:
+                    a_t = (a_t  - mean) / std
+
+                # Concatenate the images on the first dim
+                i_t = np.stack([obs[cam + "_image"] for cam in cams], axis=0)
+                o_t = np.concatenate([obs["state"][k] for k in state_key_order], axis=0, dtype=np.float32)
+
+                i_t_prime = 0 # Set to 0 to save memory.
+                o_t_prime = 0 # Set to 0 to save memory.
+                # i_t_prime = np.stack([next_obs[cam + "_image"] for cam in cams], axis=0)
+                # o_t_prime = np.concatenate([next_obs["state"][k] for k in state_key_order], axis=0, dtype=np.float32)
+
+                self.s_a_sprime.append(((i_t, o_t), a_t, (i_t_prime, o_t_prime)))
+
+    def __getitem__(self, idx):
+        (i_t, o_t), a_t, (i_t_prime, o_t_prime) = self.s_a_sprime[idx]
+
+        i_t = _img_to_tensor(i_t)
+        o_t, a_t = _to_tensor(o_t), _to_tensor(a_t)
+
+        if self.transform is not None:
+            i_t = self.transform(i_t)
+        return (i_t, o_t), a_t, (i_t_prime, o_t_prime)
+            
+

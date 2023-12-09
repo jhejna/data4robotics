@@ -6,12 +6,12 @@
 
 defaults:
   - features: vit_base
-  - policy: gaussian_mixture
+  - policy: gaussian_constant
   - _self_
 
 _target_: data4robotics.agent.Agent
 shared_mlp: [512,512]
 odim: ${task.obs_dim}
 n_cams: ${task.n_cams}
-use_obs: True
+use_obs: False
 dropout: 0.2

@@ -6,3 +6,5 @@ __pycache__/
 bc_finetune/
 visual_features/
 *.egg-info/
+*.pth
+setup_shell.sh

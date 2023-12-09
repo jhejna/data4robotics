@@ -23,15 +23,14 @@ rt: ${hydra:runtime.choices.agent/features}
 
 exp_name: test
 checkpoint_path: ${exp_name}.ckpt
-batch_size: 100
-num_workers: 10
+batch_size: 64
+num_workers: 6
 max_iterations: 50000
-eval_freq: 10000
-save_freq: 10000
+eval_freq: 2500
+save_freq: 5000
 devices: 1
 seed: 292285
 
-buffer_path: ./buffer.pkl
 ac_chunk: 1
 train_transform: medium
 
