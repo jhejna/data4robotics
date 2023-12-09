@@ -20,4 +20,6 @@ echo "working directory = "$SLURM_SUBMIT_DIR
 . /iliad2/u/jhejna/data4robotics/setup_shell.sh
 cd /iliad2/u/jhejna/data4robotics
 
-python finetune.py agent/features=vit_base agent.features.restore_path=/iliad/u/jhejna/data4robotics/vc1.pth task=coffee_pod exp_name=coffee_pod
+# Feature are vc1.pth OR IN_1M.pth
+
+python finetune.py agent/features=vit_base agent.features.restore_path=/iliad/u/jhejna/data4robotics/visual_features/vit_base/IN_1M.pth task=blue_mug exp_name=blue_mug

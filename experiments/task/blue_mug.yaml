@@ -5,7 +5,7 @@
 
 
 _target_: data4robotics.task.DefaultTask
-obs_dim: 0
+obs_dim: 8
 ac_dim: 7
 n_cams: 1
 
